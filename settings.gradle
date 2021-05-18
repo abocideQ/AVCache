@@ -1,0 +1,3 @@
+rootProject.name = "AVCache"
+include ':app'
+include ':lib_avcache'
