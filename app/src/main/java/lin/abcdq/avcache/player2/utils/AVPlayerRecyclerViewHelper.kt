@@ -1,28 +1,21 @@
-package lin.abcdq.avcache.player.exo
+package lin.abcdq.avcache.player2.utils
 
 import android.content.Context
-import android.os.Build
-import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.annotation.RequiresApi
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleObserver
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import lin.abcdq.avcache.player.AVPlayer
 import lin.abcdq.avcache.MCache
+import lin.abcdq.avcache.player2.AVPlayerFactory
+import lin.abcdq.avcache.player2.render.AVRender
 
-@RequiresApi(Build.VERSION_CODES.KITKAT)
-class AVExoListPlayerHelper {
+class AVPlayerRecyclerViewHelper {
 
-    class Data {
-        var cover = ""
-        var url = ""
-        var currentTimeMs = 0L
-    }
+    class Data(var cover: String, var url: String, var current: Long)
 
     //1.初始化(Context + Recyclerview + ControllerView + Lifecycle : onCreate调用)
     fun init(context: Context, v1: RecyclerView, v2: View, lifecycle: Lifecycle) {
@@ -31,11 +24,10 @@ class AVExoListPlayerHelper {
         init(context)
         initLifecycle(lifecycle)
         initScroller(mRecyclerView ?: return)
-        MCache.init(context)
     }
 
     //2.初始化数据(Position + Data : onCreate调用)
-    fun set(map: HashMap<Int, Data>) {
+    fun setData(map: HashMap<Int, Data>) {
         mDataMap = map
     }
 
@@ -46,6 +38,19 @@ class AVExoListPlayerHelper {
         exchangePlayer(mRecyclerView ?: return)
     }
 
+    //4.主动填充播放器
+    fun fillPlayer(position: Int, containerView: FrameLayout) {
+        if (mContainer == containerView) return
+        AVPlayerFactory.instance().stop()
+        if (mContainer != null && mPlayerView?.parent != null) mContainer?.removeView(mPlayerView)
+        mContainer = containerView
+        val measure = ViewGroup.LayoutParams.MATCH_PARENT
+        mContainer?.addView(mPlayerView, measure, measure)
+        mData = mDataMap[position] ?: return
+        AVPlayerFactory.instance().resource(mData?.url ?: return)
+        AVPlayerFactory.instance().seekTo(mData?.current ?: return)
+    }
+
     private var mDataMap = HashMap<Int, Data>()        //视频数据
     private var mData: Data? = null                     //记录用
 
@@ -53,23 +58,21 @@ class AVExoListPlayerHelper {
     private var mContainerID = 0                   //RecyclerView中item包裹PlayerView的布局ID
     private var mContainer: ViewGroup? = null      //RecyclerView中item包裹PlayerView的布局
     private var mPlayerView: FrameLayout? = null   //包裹SurfaceView + 控制层UI的布局，动态添加到item中
-    private var mSurfaceView: SurfaceView? = null  //surfaceView
+    private var mRender: AVRender? = null          //SurfaceView/TextureView
     private var mControllerView: View? = null      //控制层UI
-
     private var lifecycleObserver: LifecycleObserver? = null
     private var scrollListener: RecyclerView.OnScrollListener? = null
     private var mScrolling = false                 //滑动中禁止 onDataSetChanged 计算布局
 
     //1.初始化播放器+播放器布局+控制UI
     private fun init(context: Context) {
-        if (mSurfaceView != null) return
-        mSurfaceView = SurfaceView(context)
-        AVPlayer.init(context, AVPlayer.PLAYER.EXO)
-        AVPlayer.instance().surface(mSurfaceView ?: return)
+        AVPlayerFactory.init(context, AVPlayerFactory.Player.Exo)
+        mRender = AVPlayerFactory.instance().render()
         mPlayerView = FrameLayout(context)
         val measure = ViewGroup.LayoutParams.MATCH_PARENT
-        mPlayerView?.addView(mSurfaceView, measure, measure)
-        mPlayerView?.addView(mControllerView, measure, measure)
+        val params = FrameLayout.LayoutParams(measure, measure)
+        mPlayerView?.addView(mRender, 0)
+        mPlayerView?.addView(mControllerView, params)
     }
 
     //2.初始化Lifecycle(onResume onPause onDestroy)
@@ -78,21 +81,30 @@ class AVExoListPlayerHelper {
         lifecycleObserver = LifecycleEventObserver { source, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    if (AVPlayer.instance().surface() != mSurfaceView) {
-                        AVPlayer.instance().surface(mSurfaceView ?: return@LifecycleEventObserver)
+                    val render = AVPlayerFactory.instance().render()
+                    val parent = render?.parent
+                    if (parent != null && mRender == render) (parent as ViewGroup).removeView(render)
+                    if (mRender == render) {
+                        mPlayerView?.addView(render, 0)
+                    } else {
+                        AVPlayerFactory.instance().render(mRender ?: return@LifecycleEventObserver)
                     }
-                    AVPlayer.instance().play()
+                    AVPlayerFactory.instance().play()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    AVPlayer.instance().pause()
+                    AVPlayerFactory.instance().pause()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
-                    source.lifecycle.removeObserver(lifecycleObserver!!)
-                    lifecycleObserver = null
-                    mSurfaceView = null
-                    scrollListener = null
+                    source.lifecycle.removeObserver(
+                        lifecycleObserver ?: return@LifecycleEventObserver
+                    )
+                    mRecyclerView = null
+                    mContainer = null
                     mPlayerView = null
-                    AVPlayer.instance().stop()
+                    lifecycleObserver = null
+                    scrollListener = null
+                    AVPlayerFactory.instance().stop()
+                    AVPlayerFactory.release()
                 }
                 else -> {
                 }
@@ -118,7 +130,7 @@ class AVExoListPlayerHelper {
                 if (mContainer == null) exchangePlayer(view)
                 else if (mPlayerView?.parent != null) {
                     if (!(mContainer?.isAttachedToWindow ?: return)) {
-                        AVPlayer.instance().pause()
+                        AVPlayerFactory.instance().pause()
                         mContainer?.removeView(mPlayerView)
                     }
                 } else return
@@ -164,18 +176,25 @@ class AVExoListPlayerHelper {
         holder.setIsRecyclable(false)
         if (temp !is FrameLayout) return
         if (mContainer == temp) return
-        //视频播放
-        if (mData != null) {
-            var time = if (AVPlayer.instance().currentTimeMs() < 0) 0
-            else AVPlayer.instance().currentTimeMs()
-            mData?.currentTimeMs = time
-        }
-        mData = mDataMap[index] ?: return
-        AVPlayer.instance().resource(MCache.proxy(mData?.url ?: return) ?: return)
-        AVPlayer.instance().seekTo(mData?.currentTimeMs ?: return)
         //布局添加
         if (mContainer != null && mPlayerView?.parent != null) mContainer?.removeView(mPlayerView)
         mContainer = temp
-        mContainer?.addView(mPlayerView, 0)
+        val measure = ViewGroup.LayoutParams.MATCH_PARENT
+        mContainer?.addView(mPlayerView, measure, measure)
+        //视频播放
+        exchangePlayerData(index)
+    }
+
+    private fun exchangePlayerData(index: Int) {
+        AVPlayerFactory.instance().stop()
+        if (mData != null) {
+            val time = if (AVPlayerFactory.instance().currentTimeMs() < 0) 0
+            else AVPlayerFactory.instance().currentTimeMs()
+            mData?.current = time
+        }
+        mData = mDataMap[index] ?: return
+        val url = MCache.proxy(mData?.url ?: return) ?: return
+        AVPlayerFactory.instance().resource(url)
+        AVPlayerFactory.instance().seekTo(mData?.current ?: return)
     }
 }

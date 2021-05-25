@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.item_player.view.*
-import lin.abcdq.avcache.player.exo.AVExoListPlayerHelper
+import lin.abcdq.avcache.player2.utils.AVPlayerRecyclerViewHelper
 import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
@@ -27,14 +27,14 @@ class MainActivity : AppCompatActivity() {
         "http://8.136.101.204/v/饺子汪汪.mp4"
     )
 
-    private val mAVData = HashMap<Int, AVExoListPlayerHelper.Data>()
-    private val mAVPlayerHelper = AVExoListPlayerHelper()
+    private val mAVData = HashMap<Int, AVPlayerRecyclerViewHelper.Data>()
+    private val mAVPlayerHelper = AVPlayerRecyclerViewHelper()
     private val mList = ArrayList<Any>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
+        MCache.init(this)
         mRecyclerView.layoutManager = LinearLayoutManager(this)
         mRecyclerView.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         mAVPlayerHelper.init(this, mRecyclerView, View(this), lifecycle)
-        mAVPlayerHelper.set(mAVData)
+        mAVPlayerHelper.setData(mAVData)
         initData()
     }
 
@@ -75,9 +75,7 @@ class MainActivity : AppCompatActivity() {
         mRecyclerView.adapter?.notifyDataSetChanged()
     }
 
-    private fun newData(url: String): AVExoListPlayerHelper.Data {
-        val data = AVExoListPlayerHelper.Data()
-        data.url = url
-        return data
+    private fun newData(url: String): AVPlayerRecyclerViewHelper.Data {
+        return AVPlayerRecyclerViewHelper.Data("", url, 0)
     }
 }
