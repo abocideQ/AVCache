@@ -11,7 +11,7 @@ import androidx.lifecycle.LifecycleEventObserver
 /**
  * 视频无缝衔接用（假装activity）
  */
-abstract class AcSham(context: FragmentActivity) : FrameLayout(context) {
+abstract class ActivityCover(context: FragmentActivity) : FrameLayout(context) {
 
     fun setIntent(intent: Intent) {
         this.intent = intent
