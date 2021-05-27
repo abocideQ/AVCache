@@ -12,7 +12,7 @@ import android.widget.RelativeLayout
 
 class AVTextureView : TextureView {
 
-    private val mTAG = "CenJuneSurface"
+    private val mTAG = "AVSurface"
 
     private fun log(d: String) {
         Log.d(mTAG, d)
@@ -20,18 +20,20 @@ class AVTextureView : TextureView {
 
     constructor(context: Context) : super(context)
 
-    constructor(context: Context, attrs: AttributeSet?) : super(context, attrs)
+    constructor(context: Context, attrs: AttributeSet) : super(context, attrs)
 
-    private var mLastWidth: Float = 0f
-    private var mLastHeight: Float = 0f
+    constructor(context: Context, attrs: AttributeSet, def: Int) : super(context, attrs, def)
+
+    private var mSourceWidthRecord: Float = 0f
+    private var mSourceHeightRecord: Float = 0f
     private var mSourceWidth: Float = 0f
     private var mSourceHeight: Float = 0f
 
     fun onSizeChanged(w: Int, h: Int) {
         mSourceWidth = w.toFloat()
         mSourceHeight = h.toFloat()
-        mLastWidth = mSourceWidth
-        mLastHeight = mSourceHeight
+        mSourceWidthRecord = mSourceWidth
+        mSourceHeightRecord = mSourceHeight
         requestLayout()
     }
 
@@ -46,6 +48,10 @@ class AVTextureView : TextureView {
         val mViewHeightMode = MeasureSpec.getMode(heightMeasureSpec)
         var mViewWidth = MeasureSpec.getSize(widthMeasureSpec).toFloat()
         var mViewHeight = MeasureSpec.getSize(heightMeasureSpec).toFloat()
+        if (mSourceWidthRecord != 0f && mSourceHeightRecord != 0f) {
+            mSourceWidth = mSourceWidthRecord
+            mSourceHeight = mSourceHeightRecord
+        }
         if (mSourceWidth == 0f || mSourceHeight == 0f) {
             setMeasuredDimension(1, 1)
             return
@@ -80,6 +86,18 @@ class AVTextureView : TextureView {
             val ratio = mViewHeight / mSourceHeight
             mSourceWidth *= ratio
             mSourceHeight = mViewHeight
+        } else if (mSourceWidth < mViewWidth && mSourceHeight < mViewHeight) {
+            val widthDiff = mViewWidth - mSourceWidth
+            val heightDiff = mViewHeight - mSourceHeight
+            if (widthDiff > heightDiff) {
+                val ratio = mViewHeight / mSourceHeight
+                mSourceWidth *= ratio
+                mSourceHeight = mViewHeight
+            } else if (heightDiff > widthDiff) {
+                val ratio = mViewWidth / mSourceWidth
+                mSourceWidth = mViewWidth
+                mSourceHeight *= ratio
+            }
         }
         when (AVRender.DISPLAY_MODE) {
             AVRender.ORIGINAL -> {
@@ -87,14 +105,16 @@ class AVTextureView : TextureView {
                 mViewHeight = mSourceHeight
             }
             AVRender.FILL_CROP -> {
-                if (mSourceWidth > mSourceHeight) {
-                    val ratio = mSourceWidth / mSourceHeight
-                    mSourceWidth = mViewHeight * ratio
-                    mSourceHeight = mViewHeight
-                } else {
-                    val ratio = mSourceHeight / mSourceWidth
+                val widthDiff = mViewWidth - mSourceWidth
+                val heightDiff = mViewHeight - mSourceHeight
+                if (widthDiff > 0) {
+                    val ratio = mViewWidth / mSourceWidth
                     mSourceWidth = mViewWidth
-                    mSourceHeight = mViewWidth * ratio
+                    mSourceHeight *= ratio
+                } else if (heightDiff > 0) {
+                    val ratio = mViewHeight / mSourceHeight
+                    mSourceWidth *= ratio
+                    mSourceHeight = mViewHeight
                 }
                 mViewWidth = mSourceWidth
                 mViewHeight = mSourceHeight
@@ -107,22 +127,22 @@ class AVTextureView : TextureView {
         setMeasuredDimension(mViewWidth.toInt(), mViewHeight.toInt())
     }
 
-    private fun onGravity(view: View) {
-        val params = view.layoutParams ?: return
-        when (params) {
-            is FrameLayout.LayoutParams -> {
-                params.gravity = Gravity.CENTER
-                view.layoutParams = params
-            }
-            is RelativeLayout.LayoutParams -> {
-                params.addRule(RelativeLayout.CENTER_IN_PARENT)
-                view.layoutParams = params
-            }
-            is LinearLayout.LayoutParams -> {
-                val parent = view.parent ?: return
-                if (parent !is LinearLayout) return
-                parent.gravity = Gravity.CENTER
-            }
-        }
-    }
+//    private fun onGravity(view: View) {
+//        val params = view.layoutParams ?: return
+//        when (params) {
+//            is FrameLayout.LayoutParams -> {
+//                params.gravity = Gravity.CENTER
+//                view.layoutParams = params
+//            }
+//            is RelativeLayout.LayoutParams -> {
+//                params.addRule(RelativeLayout.CENTER_IN_PARENT)
+//                view.layoutParams = params
+//            }
+//            is LinearLayout.LayoutParams -> {
+//                val parent = view.parent ?: return
+//                if (parent !is LinearLayout) return
+//                parent.gravity = Gravity.CENTER
+//            }
+//        }
+//    }
 }
