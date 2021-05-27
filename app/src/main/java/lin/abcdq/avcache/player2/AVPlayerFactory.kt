@@ -36,9 +36,9 @@ class AVPlayerFactory {
         private var mAVPlayer: AVBasePlayer? = null
 
         @Synchronized
-        fun instance(): AVBasePlayer {
+        fun instance(): AVBasePlayer? {
             synchronized(mPlayerLock) {
-                return mAVPlayer!!
+                return mAVPlayer
             }
         }
     }

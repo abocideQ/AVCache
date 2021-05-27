@@ -18,37 +18,57 @@ class AVPlayerRecyclerViewHelper {
     class Data(var cover: String, var url: String, var current: Long)
 
     //1.初始化(Context + Recyclerview + ControllerView + Lifecycle : onCreate调用)
-    fun init(context: Context, v1: RecyclerView, v2: View, lifecycle: Lifecycle) {
+    fun init(context: Context, v1: RecyclerView, v2: View, map: HashMap<Int, Data>) {
         mRecyclerView = v1
         mControllerView = v2
         init(context)
-        initLifecycle(lifecycle)
         initScroller(mRecyclerView ?: return)
     }
 
-    //2.初始化数据(Position + Data : onCreate调用)
-    fun setData(map: HashMap<Int, Data>) {
-        mDataMap = map
-    }
-
-    //3.更新调用(onBindViewHolder调用)
+    //2.更新调用(onBindViewHolder调用)
     fun onDataSetChanged(ContainerView: View?) {
         if (mScrolling) return
         if (ContainerView != null) mContainerID = ContainerView.id
         exchangePlayer(mRecyclerView ?: return)
     }
 
-    //4.主动填充播放器
+    //3.主动填充播放器
     fun fillPlayer(position: Int, containerView: FrameLayout) {
         if (mContainer == containerView) return
-        AVPlayerFactory.instance().stop()
+        AVPlayerFactory.instance()?.stop()
         if (mContainer != null && mPlayerView?.parent != null) mContainer?.removeView(mPlayerView)
         mContainer = containerView
         val measure = ViewGroup.LayoutParams.MATCH_PARENT
         mContainer?.addView(mPlayerView, measure, measure)
         mData = mDataMap[position] ?: return
-        AVPlayerFactory.instance().resource(mData?.url ?: return)
-        AVPlayerFactory.instance().seekTo(mData?.current ?: return)
+        AVPlayerFactory.instance()?.resource(mData?.url ?: return)
+        AVPlayerFactory.instance()?.seekTo(mData?.current ?: return)
+    }
+
+    fun onResume() {
+        AVPlayerFactory.instance()?.volume(0f)
+        AVPlayerFactory.instance()?.play()
+        val render = AVPlayerFactory.instance()?.render()
+        val parent = render?.parent
+        if (parent != null && mRender == render) (parent as ViewGroup).removeView(render)
+        if (mRender == render) {
+            mPlayerView?.addView(render, 0)
+        } else {
+            AVPlayerFactory.instance()?.render(mRender ?: return)
+        }
+    }
+
+    fun onPause() {
+        AVPlayerFactory.instance()?.pause()
+    }
+
+    fun onDestroy() {
+        mRecyclerView = null
+        mContainer = null
+        mPlayerView = null
+        lifecycleObserver = null
+        scrollListener = null
+        AVPlayerFactory.instance()?.stop()
     }
 
     private var mDataMap = HashMap<Int, Data>()        //视频数据
@@ -67,7 +87,7 @@ class AVPlayerRecyclerViewHelper {
     //1.初始化播放器+播放器布局+控制UI
     private fun init(context: Context) {
         AVPlayerFactory.init(context, AVPlayerFactory.Player.Exo)
-        mRender = AVPlayerFactory.instance().render()
+        mRender = AVPlayerFactory.instance()?.render()
         mPlayerView = FrameLayout(context)
         val measure = ViewGroup.LayoutParams.MATCH_PARENT
         val params = FrameLayout.LayoutParams(measure, measure)
@@ -75,45 +95,7 @@ class AVPlayerRecyclerViewHelper {
         mPlayerView?.addView(mControllerView, params)
     }
 
-    //2.初始化Lifecycle(onResume onPause onDestroy)
-    private fun initLifecycle(lifecycle: Lifecycle) {
-        if (lifecycleObserver != null) return
-        lifecycleObserver = LifecycleEventObserver { source, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    val render = AVPlayerFactory.instance().render()
-                    val parent = render?.parent
-                    if (parent != null && mRender == render) (parent as ViewGroup).removeView(render)
-                    if (mRender == render) {
-                        mPlayerView?.addView(render, 0)
-                    } else {
-                        AVPlayerFactory.instance().render(mRender ?: return@LifecycleEventObserver)
-                    }
-                    AVPlayerFactory.instance().play()
-                }
-                Lifecycle.Event.ON_PAUSE -> {
-                    AVPlayerFactory.instance().pause()
-                }
-                Lifecycle.Event.ON_DESTROY -> {
-                    source.lifecycle.removeObserver(
-                        lifecycleObserver ?: return@LifecycleEventObserver
-                    )
-                    mRecyclerView = null
-                    mContainer = null
-                    mPlayerView = null
-                    lifecycleObserver = null
-                    scrollListener = null
-                    AVPlayerFactory.instance().stop()
-                    AVPlayerFactory.release()
-                }
-                else -> {
-                }
-            }
-        }
-        lifecycle.addObserver(lifecycleObserver!!)
-    }
-
-    //3.RecyclerView滑动监听
+    //2.RecyclerView滑动监听
     private fun initScroller(view: RecyclerView) {
         if (scrollListener != null) return
         scrollListener = object : RecyclerView.OnScrollListener() {
@@ -130,7 +112,7 @@ class AVPlayerRecyclerViewHelper {
                 if (mContainer == null) exchangePlayer(view)
                 else if (mPlayerView?.parent != null) {
                     if (!(mContainer?.isAttachedToWindow ?: return)) {
-                        AVPlayerFactory.instance().pause()
+                        AVPlayerFactory.instance()?.pause()
                         mContainer?.removeView(mPlayerView)
                     }
                 } else return
@@ -186,15 +168,15 @@ class AVPlayerRecyclerViewHelper {
     }
 
     private fun exchangePlayerData(index: Int) {
-        AVPlayerFactory.instance().stop()
+        AVPlayerFactory.instance()?.stop()
         if (mData != null) {
-            val time = if (AVPlayerFactory.instance().currentTimeMs() < 0) 0
-            else AVPlayerFactory.instance().currentTimeMs()
-            mData?.current = time
+            val time = if (AVPlayerFactory.instance()?.currentTimeMs() ?: 0 < 0) 0
+            else AVPlayerFactory.instance()?.currentTimeMs()
+            mData?.current = time ?: 0
         }
         mData = mDataMap[index] ?: return
         val url = MCache.proxy(mData?.url ?: return) ?: return
-        AVPlayerFactory.instance().resource(url)
-        AVPlayerFactory.instance().seekTo(mData?.current ?: return)
+        AVPlayerFactory.instance()?.resource(url)
+        AVPlayerFactory.instance()?.seekTo(mData?.current ?: return)
     }
 }

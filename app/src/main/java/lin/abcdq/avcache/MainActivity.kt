@@ -58,8 +58,7 @@ class MainActivity : AppCompatActivity() {
                 return mList.size
             }
         }
-        mAVPlayerHelper.init(this, mRecyclerView, View(this), lifecycle)
-        mAVPlayerHelper.setData(mAVData)
+        mAVPlayerHelper.init(this, mRecyclerView, View(this), mAVData)
         initData()
     }
 
