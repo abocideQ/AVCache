@@ -13,6 +13,10 @@ import androidx.lifecycle.LifecycleEventObserver
  */
 abstract class ActivityCover(context: FragmentActivity) : FrameLayout(context) {
 
+    fun startActivityCover() {
+        init()
+    }
+
     fun setIntent(intent: Intent) {
         this.intent = intent
     }
@@ -33,8 +37,8 @@ abstract class ActivityCover(context: FragmentActivity) : FrameLayout(context) {
         return mActivity
     }
 
-    fun startAcSham() {
-        init()
+    fun finish() {
+        release()
     }
 
     private var intent: Intent? = null
@@ -45,68 +49,43 @@ abstract class ActivityCover(context: FragmentActivity) : FrameLayout(context) {
     private var mOwnerLifecycleObserver: LifecycleEventObserver? = null
 
     private fun init() {
+        initLifecycle()
+        initView()
+    }
+
+    private fun initLifecycle() {
         mOwnerLifecycleObserver = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
-                    onResumed()
+                    onActivityResumed()
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    onPaused()
+                    onActivityPaused()
                 }
                 Lifecycle.Event.ON_STOP -> {
-                    onStopped()
+                    onActivityStopped()
                 }
                 Lifecycle.Event.ON_DESTROY -> {
-                    onDestroyed()
-                    release(true)
+                    onActivityDestroyed()
                 }
                 else -> {
                 }
             }
         }
         mOwnerLifecycle.addObserver(mOwnerLifecycleObserver ?: return)
+    }
+
+    private fun initView() {
         if (mDecorView == null) return
         focusRequest(mDecorView as ViewGroup, this)
         val measure = ViewGroup.LayoutParams.MATCH_PARENT
         (mDecorView as ViewGroup).addView(this, measure, measure)
-        val view = LayoutInflater.from(context).inflate(onCreateView(), null)
+        val view = LayoutInflater.from(context).inflate(onCoverCreateView(), null)
         this.addView(view, measure, measure)
-        onViewCreated(view)
+        onCoverViewCreated(view)
     }
 
-    protected abstract fun onCreateView(): Int
-
-    protected abstract fun onViewCreated(view: View)
-
-    protected abstract fun onResumed()
-
-    protected abstract fun onPaused()
-
-    protected abstract fun onStopped()
-
-    protected abstract fun onDestroyed()
-
-    protected abstract fun finish(): Boolean
-
-    override fun onTouchEvent(event: MotionEvent?): Boolean {
-        return true
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val finish = finish()
-        if (!finish) return true
-        release(false)
-        return true
-    }
-
-    protected fun release(finished: Boolean) {
-        if (finished) {
-            intent = null
-            onResult = null
-            val parent = this.parent
-            if (parent != null) (parent as ViewGroup).removeView(this)
-        }
-        mActivity = null
+    private fun release() {
         if (mDecorView != null) {
             focusReturn(mDecorView as ViewGroup, this)
             mDecorView = null
@@ -115,6 +94,33 @@ abstract class ActivityCover(context: FragmentActivity) : FrameLayout(context) {
             mOwnerLifecycle.removeObserver(mOwnerLifecycleObserver ?: return)
             mOwnerLifecycleObserver = null
         }
+        if (this.parent != null) (this.parent as ViewGroup).removeView(this)
+        intent = null
+        onResult = null
+        mActivity = null
+    }
+
+    protected abstract fun onCoverCreateView(): Int
+
+    protected abstract fun onCoverViewCreated(view: View)
+
+    protected abstract fun onActivityResumed()
+
+    protected abstract fun onActivityPaused()
+
+    protected abstract fun onActivityStopped()
+
+    protected abstract fun onActivityDestroyed()
+
+    protected abstract fun onBackPress()
+
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        return true
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        onBackPress()
+        return true
     }
 
     private fun focusRequest(root: ViewGroup, view: View) {
