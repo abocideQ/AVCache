@@ -6,27 +6,25 @@ import lin.abcdq.avcache.player2.ActivityCover
 
 class MainActivityCover(context: FragmentActivity) : ActivityCover(context) {
 
-    override fun onCreateView(): Int {
+    override fun onCoverCreateView(): Int {
         return 0
     }
 
-    override fun onViewCreated(view: View) {
+    override fun onCoverViewCreated(view: View) {
     }
 
-    override fun onResumed() {
+    override fun onActivityResumed() {
     }
 
-    override fun onPaused() {
+    override fun onActivityPaused() {
     }
 
-    override fun onStopped() {
+    override fun onActivityStopped() {
     }
 
-    override fun onDestroyed() {
+    override fun onActivityDestroyed() {
     }
 
-    override fun finish(): Boolean {
-        return true
+    override fun onBackPress() {
     }
-
 }
